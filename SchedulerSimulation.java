@@ -3,6 +3,8 @@ import java.util.Queue;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Random;
+import java.util.List; /* امبورت للست والاراي ليست مهمة للفيتشر رقم 3  */
+import java.util.ArrayList;
 
 // ANSI Color Codes for enhanced terminal output
 class Colors {
@@ -30,6 +32,10 @@ class Process implements Runnable {
     private int timeQuantum; // Time slice (time quantum) allowed per CPU access (in milliseconds)
     private int remainingTime; // Time left for the process to finish its execution
     private int priority;
+    private long creationTime; // متغير يحسب وقت الانشاء
+    private long totalwaitingTime;// متغير يحسب مجموع وقت الانتظار 
+    private long lastEnqueuedTime; // حساب اخر وقت دخول لقائمة او لطابور  الانتظار 
+
     // Constructor to initialize the process with name, burst time, and time quantum
     public Process(String name, int burstTime, int timeQuantum, int priority) {
         this.name = name;
@@ -37,6 +43,9 @@ class Process implements Runnable {
         this.timeQuantum = timeQuantum;
         this.remainingTime = burstTime; // Initially, remaining time is equal to the burst time
         this.priority = priority;
+        this.creationTime = System.currentTimeMillis();// اهم شيء هنا الصيغة وطريقة الحساب حتى تتناسب مع نوع المتغير longSystem.currentTimeMillis() فتم استخدام 
+        this.totalwaitingTime = 0;
+        this.lastEnqueuedTime = 0;
     }
 
     // This method will be called when the thread for this process is started
@@ -141,7 +150,14 @@ class Process implements Runnable {
     public int getPriority() {
     return priority;
    }
-
+    public void setLastEnqueuedTime(long time) { this.lastEnqueuedTime = time; }
+    // تعيين اخر زمن لدخول الطابور 
+    public long getLastEnqueuedTime() { return lastEnqueuedTime; }
+    //جلب القيمة (ونحتاجها للاستدعائها في  جملة الطباعة )
+    public void addWaitingTime(long time) { this.totalwaitingTime += time; }
+    //هذه الخطوة لعمل خطوة تشبه الدالة تحسب اجمالي الوقت المنصرم في الانتظار 
+    public long getTotalWaitingTime() { return totalwaitingTime; }
+    // ترجع قيمة الوقت المنصرك في الانتظار 
     // Check if the process has finished (i.e., no remaining time)
     public boolean isFinished() {
         return remainingTime <= 0;
@@ -165,7 +181,7 @@ public class SchedulerSimulation {
         
         // Generate random number of processes between 10 and 20
         int numProcesses = 10 + random.nextInt(11); // Random number between 10 and 20
-        
+        List<Process> allProcesses = new ArrayList<>();
         // Queue to manage processes in a First-In-First-Out (FIFO) order
         Queue<Thread> processQueue = new LinkedList<>();
         
@@ -208,7 +224,7 @@ public class SchedulerSimulation {
             
             // Create a new process object with a unique name, burst time, and the defined time quantum
             Process process = new Process("P" + i, burstTime, timeQuantum , randPriority);
-            
+            allProcesses.add(process);
             // Add the process to the ready queue and the map
             addProcessToQueue(process, processQueue, processMap);
         }
@@ -229,6 +245,9 @@ public class SchedulerSimulation {
         while (!processQueue.isEmpty()) {
             // Get the next thread from the queue (FIFO)
             Thread currentThread = processQueue.poll(); // Dequeues the next thread
+
+            Process currentProcess = processMap.get(currentThread);
+            currentProcess.addWaitingTime(System.currentTimeMillis() - currentProcess.getLastEnqueuedTime());
             
             // Print the current process queue (list of process IDs in the queue)
             System.out.println(Colors.BOLD + Colors.MAGENTA + "┌─ Ready Queue " + "─".repeat(65) + Colors.RESET);
@@ -289,11 +308,21 @@ public class SchedulerSimulation {
                           Colors.RESET + "\n");
 
                 System.out.println("Total context switches: " + contextswitches);/* اضافة جملة الطباعة كما في المثال المرفق للمرات  */
+
+                System.out.println(" Waiting Time Summary");
+                System.out.println("Process Name Burst Time Waiting Time");
+                    System.out.println("--------------------------------------------------");
+            for (Process p : allProcesses) {
+                     System.out.println(p.getName() + "\t\t" + p.getBurstTime() + "ms\t\t" + p.getTotalWaitingTime() + "ms");
+            }
+        
     }
     
     // Method to add a process to the queue and map, while printing a "ready" message
     public static void addProcessToQueue(Process process, Queue<Thread> processQueue, 
                                         Map<Thread, Process> processMap) {
+
+        process.setLastEnqueuedTime(System.currentTimeMillis());
         // Create a new thread to run the process
         Thread thread = new Thread(process);
         
